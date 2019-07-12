@@ -9,15 +9,9 @@ public class PlayerManager : MonoBehaviour {
     public class Player
     {
         int playerId;
-        public UnityEngine.KeyCode forward;
-        public UnityEngine.KeyCode left;
-        public UnityEngine.KeyCode right;
-        public Player(int pId, UnityEngine.KeyCode frwd, UnityEngine.KeyCode lt, UnityEngine.KeyCode rt)
+        public Player(int pId)
         {
             this.playerId = pId;
-            this.forward = frwd;
-            this.left = lt;
-            this.right = rt;
         }
     }
 
@@ -32,8 +26,8 @@ public class PlayerManager : MonoBehaviour {
     {
         assignedPlayers = 0;
         players = new List<Player>();
-        players.Add(new Player(0, KeyCode.W, KeyCode.A, KeyCode.D));
-        players.Add(new Player(1, KeyCode.UpArrow, KeyCode.LeftArrow, KeyCode.RightArrow));
+        players.Add(new Player(0));
+        players.Add(new Player(1));
     }
 
     public int AssignPlayer()
