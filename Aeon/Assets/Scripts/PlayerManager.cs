@@ -17,6 +17,8 @@ public class PlayerManager : MonoBehaviour {
 
     public List<Player> players;
     public int assignedPlayers;
+    public int assignedShips;
+    public List<Ship> ships;
 	// Use this for initialization
 	void Start () {
 
@@ -28,6 +30,13 @@ public class PlayerManager : MonoBehaviour {
         players = new List<Player>();
         players.Add(new Player(0));
         players.Add(new Player(1));
+        ships = new List<Ship>();
+    }
+
+    public int AssignShip()
+    {
+        assignedShips++;
+        return assignedShips;
     }
 
     public int AssignPlayer()

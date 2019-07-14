@@ -5,8 +5,9 @@ using UnityEngine;
 public class Laser : MonoBehaviour {
 
     public Vector3 velocity;
-    public PlayerController ship;
+    public Ship ship;
     private float maxLifetime = 10;
+    private float currentLifetime = 0;
     public float damage;
 	// Use this for initialization
 	void Start () {
@@ -16,21 +17,25 @@ public class Laser : MonoBehaviour {
 	// Update is called once per frame
 	void Update () {
         gameObject.transform.position += velocity * Time.deltaTime;
-
+        currentLifetime += Time.deltaTime;
+        if (currentLifetime > maxLifetime)
+        {
+            Destroy(gameObject);
+        }
     }
 
     void OnTriggerEnter2D(Collider2D col)
     {
-        PlayerController possibleTarget = col.gameObject.GetComponent<PlayerController>();
+        Ship possibleTarget = col.gameObject.GetComponent<Ship>();
         if (possibleTarget != null)
         {
-            if (possibleTarget == ship)
+            if (possibleTarget == ship || possibleTarget.teamId == ship.teamId)
             {
                 return;
             }
             else
             {
-                possibleTarget.TakeDamage(damage);
+                possibleTarget.TakeDamage(damage, ship);
             }
         }
 

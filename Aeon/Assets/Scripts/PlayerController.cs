@@ -2,54 +2,42 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class PlayerController : MonoBehaviour {
-
-    Vector2 acceleration;
-    float speed = 5000f;
-    float turnSpeed = 1;
-    Rigidbody2D myBody;
+public class PlayerController : Ship {
     GameObject self;
-    Vector2 forward;
     int playerId;
     Camera trackingCamera;
     Vector3 offset = new Vector3(0, 0, -10);
     private GameObject playerManagerObject;
     private PlayerManager playerManager;
     PlayerManager.Player player;
-    public Laser laserPrefab;
-    private float firingTimer = 0.2f;
-    private float firingTimerReset;
-    private float maxSpeed = 5;
-    private float speedUpTime = 0.5f;
-    private float thrustingTime = 0;
     private bool lastDirectionForward = true;
-    public float health = 30;
-
-    public bool isAlive
-    {
-        get { return health > 0; }
-    }
+    private float deathTime = 0;
+    private float deathTimeMax = 3;
 
     //todo
-    //health
     //death
-    //not being able to do both triggers at once
 
     // Use this for initialization
     void Start () {
         acceleration = new Vector2();
         myBody = gameObject.GetComponent<Rigidbody2D>();
+        health = 60;
+        speed = 5500;
 
         playerManagerObject = GameObject.Find("PlayerManagerMain");
         //get playerId from the PlayerManager
         playerManager = playerManagerObject.GetComponent<PlayerManager>();
         playerId = playerManager.AssignPlayer();
         player = playerManager.players[playerId];
+        shipId = playerManager.AssignShip();
+        AIControlled = false;
 
         //getting the camera
         trackingCamera = GameObject.Find("camera" + playerId).GetComponent<Camera>();
 
         firingTimerReset = firingTimer;
+        playerManager.ships.Add(this);
+        forward = new Vector2(transform.up.x, transform.up.y);
     }
 
     void Awake()
@@ -59,17 +47,35 @@ public class PlayerController : MonoBehaviour {
 	
 	// Update is called once per frame
 	void FixedUpdate () {
+        //revive cheat currently
+        if (Input.GetButton("Y_P" + playerId))
+        {
+            health = 999;
+            SpriteRenderer art = gameObject.GetComponentInChildren<SpriteRenderer>();
+            if (art != null)
+            {
+                art.color = new Color(1, 1, 1, 1);
+            }
+        }
 
+        float deltaTime = Time.deltaTime;
         if (!isAlive)
         {
+            deathTime += deltaTime;
+            if (deathTime > deathTimeMax)
+            {
+                TakeOverOtherShip();
+            }
             return;
         }
         trackingCamera.transform.position = transform.position + offset;
-        float deltaTime = Time.deltaTime;
+        
 
         bool pressed = false;
         bool thrusting = false;
-        forward = new Vector2(transform.up.x, transform.up.y);
+        
+        forward.x = transform.up.x;
+        forward.y = transform.up.y;
 
         float propulsion = Input.GetAxis("RightTrigger_P" + playerId);
         if (propulsion > 0)
@@ -107,15 +113,27 @@ public class PlayerController : MonoBehaviour {
 
         if (Input.GetButton("B_P" + playerId) && firingTimer == 0)
         {
+            Vector2 normalizedForward = forward.normalized;
+            Vector3 offset = fireRight ? new Vector3(-normalizedForward.y, normalizedForward.x, 0).normalized * 0.65f :
+                new Vector3(normalizedForward.y, -normalizedForward.x, 0).normalized * 0.65f;
+            fireRight = !fireRight;
+
             Laser newLaser = (Laser)Instantiate(laserPrefab,
-                transform.position + (new Vector3(forward.x, forward.y, 0) * 1),
+                transform.position + (new Vector3(normalizedForward.x, normalizedForward.y, 0) * -0.02f) + offset,
                 transform.rotation);
+
             newLaser.velocity = new Vector3(forward.x, forward.y, 0) * 5;
             newLaser.velocity.x += myBody.velocity.x;
             newLaser.velocity.y += myBody.velocity.y;
             newLaser.ship = this;
             newLaser.damage = 10;
             firingTimer = firingTimerReset;
+        }
+
+        //debug do damage to self
+        if (Input.GetButton("X_P" + playerId))
+        {
+            TakeDamage(999, this);
         }
 
         float turningAxis = Input.GetAxis("LeftJoystickX_P" + playerId);
@@ -154,15 +172,30 @@ public class PlayerController : MonoBehaviour {
         }
     }
 
-    public void TakeDamage(float damageAmount)
+    private void TakeOverOtherShip()
     {
-        health -= damageAmount;
-        if (!isAlive)
+        //take over an AI ship somehow
+        int shipNum = playerManager.ships.Count;
+        for (int i = 0; i < shipNum; i++)
         {
-            SpriteRenderer art = gameObject.GetComponentInChildren<SpriteRenderer>();
-            if (art != null)
+            Ship temp = playerManager.ships[i];
+            if (temp != this && temp.isAlive && temp.teamId == teamId)
             {
-                art.color = new Color(94, 79, 79);
+                myBody.velocity = temp.myBody.velocity;
+                myBody.angularDrag = temp.myBody.angularDrag;
+                myBody.angularVelocity = temp.myBody.angularVelocity;
+                transform.position = temp.transform.position;
+                transform.rotation = temp.transform.rotation;
+                health = temp.health;
+                SpriteRenderer art = gameObject.GetComponentInChildren<SpriteRenderer>();
+                if (art != null)
+                {
+                    art.color = new Color(1, 1, 1, 1);
+                }
+                Destroy(temp.gameObject);
+                deathTime = 0;
+                playerManager.ships.RemoveAt(i);
+                break;
             }
         }
     }
