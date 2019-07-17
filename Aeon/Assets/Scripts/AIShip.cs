@@ -8,6 +8,9 @@ public class AIShip : Ship
     //todo
     //dont just activate strafe on firing
     //have variable or increase of pursue distance
+
+    //use the same laser math as the player
+    //make it so ships can follow the player with that expand thing
     private PlayerManager playerManager;
     private Ship target;
     private Ship aggressor;
@@ -26,7 +29,7 @@ public class AIShip : Ship
     private Vector2 targetLocation;
 
     public List<AIShip> followingShips;
-    private enum eState
+    public enum eState
     {
         Hunting,
         Fleeing,
@@ -36,8 +39,7 @@ public class AIShip : Ship
         Following
     }
 
-    private eState state;
-    // Use this for initialization
+    public eState state;
     void Start () {
         firingTimerReset = firingTimer;
         acceleration = new Vector2();
@@ -51,9 +53,9 @@ public class AIShip : Ship
         new Vector2(transform.up.x, transform.up.y);
         shipId = playerManager.AssignShip();
         followingShips = new List<AIShip>();
+        base.LateStart();
     }
-	
-	// Update is called once per frame
+
 	void FixedUpdate () {
 
         if (!isAlive)
@@ -61,6 +63,7 @@ public class AIShip : Ship
             return;
         }
 
+        CustomUpdate();
         forward.x = transform.up.x;
         forward.y = transform.up.y;
         float deltaTime = Time.deltaTime;
@@ -70,25 +73,29 @@ public class AIShip : Ship
             case eState.Travelling:
             {
                 // find a target if we dont have one
-                if (target == null || !target.isAlive)
+                if (target == null || !target.isAlive || target.teamId == teamId)
                 {
-                    //todo better way to find enemies, likely using distance
+                    //todo better distance calculation once sections are completed
                     int shipNum = playerManager.ships.Count;
-                    int checkNum = Random.Range(0, shipNum - 1);
+                    int foundNum = -1;
+                    float dist = 9999999;
                     for (int i = 0; i < shipNum; i++)
                     {
-                        Ship temp = playerManager.ships[checkNum];
-                        if (temp.shipId != shipId && temp.isAlive && temp.teamId != teamId)
+                        Ship temp = playerManager.ships[i];
+                        if (temp.shipId != shipId &&
+                            temp.isAlive &&
+                            temp.teamId != teamId &&
+                            Vector2.Distance(temp.transform.position,transform.position) < dist)
                         {
-                            target = temp;
-                            state = eState.Hunting;
-                            break;
+                            dist = Vector2.Distance(temp.transform.position, transform.position);
+                            foundNum = i;
                         }
-                        checkNum++;
-                        if (checkNum >= shipNum)
-                        {
-                            checkNum = 0;
-                        }
+                    }
+
+                    if (foundNum >= 0)
+                    {
+                        target = playerManager.ships[foundNum];
+                        state = eState.Hunting;
                     }
                 }
                 else
@@ -119,6 +126,17 @@ public class AIShip : Ship
                             MoveForward(deltaTime, 1.5f, false, 0.2f);
                         }
                     }
+
+                    AIShip theOtherShip = ((AIShip)target);
+                    if (!target.isAlive || theOtherShip.state == eState.Travelling || theOtherShip.state == eState.Fleeing)
+                    {
+                        state = eState.Travelling;
+                        theOtherShip.followingShips.Remove(this);
+                    }
+                }
+                else
+                {
+                    state = eState.Travelling;
                 }
 
             }
@@ -180,7 +198,7 @@ public class AIShip : Ship
                     }
 
                     //check for any other ship that is following the same target
-                    //if (followingShips.Count == 0)
+                    if (followingShips.Count < 2)
                     {
                         int shipNum = playerManager.ships.Count;
                         for (int i = 0; i < shipNum; i++)
@@ -192,7 +210,8 @@ public class AIShip : Ship
                                     temp.isAlive &&
                                     temp.teamId == teamId &&
                                     temp.state == eState.Hunting &&
-                                    temp.target.shipId == this.target.shipId
+                                    temp.target.shipId == this.target.shipId &&
+                                    temp.followingShips.Count < 2
                                     )
                                 {
                                     target = temp;
@@ -300,24 +319,24 @@ public class AIShip : Ship
                 break;
             }
 
-            if (followerCount > 1)
-            {
-                followingShips[i].UpdateFollowingTargetLocation(followerCount, first);
+            //if (followerCount > 1)
+            //{
+                followingShips[i].UpdateFollowingTargetLocation(first);
                 first = false;
-            }
-            else
-            {
-                followingShips[i].UpdateFollowingTargetLocation();
-            }
+            //}
+            //else
+            //{
+                //followingShips[i].UpdateFollowingTargetLocation();
+            //}
             
         }
     }
 
-    public void UpdateFollowingTargetLocation(int count = 1, bool first = true)
+    public void UpdateFollowingTargetLocation(bool first = true)
     {
         Vector2 normalizedTargetForward = target.forward.normalized;
         Vector2 targPos = new Vector2(target.transform.position.x, target.transform.position.y);
-        if (count > 1)
+        //if (count > 1)
         {
             if (first)
             {
@@ -332,21 +351,21 @@ public class AIShip : Ship
                     (new Vector2(normalizedTargetForward.y, -normalizedTargetForward.x).normalized * 1.4f);
             }
         }
-        else
-        {
-            targetLocation = targPos + 
-                normalizedTargetForward * 0.3f;
-        }
+        //else
+        //{
+        //    targetLocation = targPos + 
+        //        normalizedTargetForward * 0.3f;
+        //}
     }
 
-    public void TotalFollowerCount(ref int followerCount)
-    {
-        if (followingShips.Count > 0)
-        {
-            followerCount++;
-            followingShips[0].TotalFollowerCount(ref followerCount);
-        }
-    }
+    //public void TotalFollowerCount(ref int followerCount)
+    //{
+    //    if (followingShips.Count > 0)
+    //    {
+    //        followerCount++;
+    //        followingShips[0].TotalFollowerCount(ref followerCount);
+    //    }
+    //}
     public void AssignShipFollow(AIShip theShip)
     {
         if (followingShips.Count > 0)
@@ -385,55 +404,51 @@ public class AIShip : Ship
         }
     }
 
-    public void AssignNewFollowTarget(ref int levels, int targetLevel, AIShip newTarg)
-    {
-        if(levels == targetLevel)
-        {
-            AIShip otherShip = (AIShip)target;
-            otherShip.followingShips.Remove(this);
-            target = newTarg;
-            newTarg.followingShips.Add(this);
-        }
-        else
-        {
-            levels++;
-            followingShips[0].AssignNewFollowTarget(ref levels, targetLevel, newTarg);
-        }
-    }
+    //public void AssignNewFollowTarget(ref int levels, int targetLevel, AIShip newTarg)
+    //{
+    //    if(levels == targetLevel)
+    //    {
+    //        AIShip otherShip = (AIShip)target;
+    //        otherShip.followingShips.Remove(this);
+    //        target = newTarg;
+    //        newTarg.followingShips.Add(this);
+    //    }
+    //    else
+    //    {
+    //        levels++;
+    //        followingShips[0].AssignNewFollowTarget(ref levels, targetLevel, newTarg);
+    //    }
+    //}
 
     public void FindFollowingPosition(AIShip parent = null)
     {
         AIShip otherShip = (AIShip)target;
-        int followerCount = otherShip.followingShips.Count;
-        if (followerCount < 2)
-        {
-            otherShip.followingShips.Add(this);
-            //when you add in this way there has to be some sort of check to split the followers
-            int totalFollowing = 0;
-            TotalFollowerCount(ref totalFollowing);
-            if (totalFollowing > 1)
-            {
-                int levelCount = 0;
-                AssignNewFollowTarget(ref levelCount, totalFollowing / 2, otherShip);
-            }
-        }
-        else
-        {
-            int leftSideCount = 0;
-            otherShip.followingShips[0].TotalFollowerCount(ref leftSideCount);
 
-            int rightSideCount = 0;
-            otherShip.followingShips[1].TotalFollowerCount(ref rightSideCount);
-
-            if (leftSideCount < rightSideCount)
-            {
-                otherShip.followingShips[0].AssignShipFollow(this);
-            }
-            else
-            {
-                otherShip.followingShips[1].AssignShipFollow(this);
-            }
+        otherShip.followingShips.Add(this);
+        if (followingShips.Count > 0)
+        {
+            followingShips[0].state = eState.Travelling;
+            followingShips[0].target = null;
+            followingShips.RemoveAt(0);
         }
+
+        //else
+        //{
+        //    int leftSideCount = 0;
+        //    otherShip.followingShips[0].TotalFollowerCount(ref leftSideCount);
+
+        //    int rightSideCount = 0;
+        //    otherShip.followingShips[1].TotalFollowerCount(ref rightSideCount);
+
+        //    if (leftSideCount < rightSideCount)
+        //    {
+        //        otherShip.followingShips[0].AssignShipFollow(this);
+        //    }
+        //    else
+        //    {
+        //        otherShip.followingShips[1].AssignShipFollow(this);
+        //    }
+        //}
     }
 
     public void MoveForward(float deltaTime, float angularDrag, bool thrusting, float modifier = 1)
@@ -494,12 +509,13 @@ public class AIShip : Ship
     public override void TakeDamage(float damageAmount, Ship attacker)
     {
         base.TakeDamage(damageAmount, attacker);
+
         if (isAlive)
         {
             //todo
             //do a chance check and maybe check fearfulness (doesn't exist yet)
             //check current health as well
-            if (Random.Range(0, 50) > 22)
+            if (Random.Range(0, 50) > 40)
             {
                 aggressor = attacker;
                 switch (state)

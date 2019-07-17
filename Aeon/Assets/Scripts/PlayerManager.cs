@@ -44,6 +44,19 @@ public class PlayerManager : MonoBehaviour {
         if (assignedPlayers < players.Count)
         {
             assignedPlayers++;
+            //adjust the cameras
+            if (assignedPlayers == 2)
+            {
+
+            }
+            else if (assignedPlayers == 3)
+            {
+
+            }
+            else if (assignedPlayers == 4)
+            {
+
+            }
             return assignedPlayers-1;
         }
         else

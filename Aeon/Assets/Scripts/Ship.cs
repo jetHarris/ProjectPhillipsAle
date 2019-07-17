@@ -10,6 +10,8 @@ public class Ship : MonoBehaviour {
     protected float speedUpTime = 0.5f;
     protected float thrustingTime = 0;
     public float health = 30;
+    public float shieldHealth = 40;
+    public float shieldCount = 0;
     public Vector2 forward;
     protected float speed = 5000f;
     protected float turnSpeed = 1;
@@ -19,6 +21,13 @@ public class Ship : MonoBehaviour {
     public int shipId;
     public bool AIControlled = true;
     protected bool fireRight = true;
+    protected float shieldTimer = 0;
+    protected float shieldTimerReset = 1;
+    protected SpriteRenderer shipArt;
+    protected SpriteRenderer thrusterArt;
+    protected SpriteRenderer shieldArt;
+    protected float alertTimer = 0;
+    protected bool goingRed = true;
     public bool isAlive
     {
         get { return health > 0; }
@@ -30,24 +39,81 @@ public class Ship : MonoBehaviour {
         acceleration = new Vector2();
         myBody = gameObject.GetComponent<Rigidbody2D>();
     }
+
+    protected void LateStart()
+    {
+        var Sprites = gameObject.GetComponentsInChildren<SpriteRenderer>();
+        shipArt = Sprites[0];
+        thrusterArt = Sprites[1];
+        thrusterArt.enabled = false;
+        shieldArt = Sprites[2];
+        shieldArt.color = new Color(1, 1, 1, 0);
+    }
 	
 	// Update is called once per frame
-	void FixedUpdate () {
-		
-	}
+	protected void CustomUpdate () {
+        float deltaTime = Time.deltaTime;
+		if (shieldHealth <= 0)
+        {
+            shieldCount += deltaTime;
+            if (shieldCount > 4)
+            {
+                shieldCount = 0;
+                shieldHealth = 40;
+                shipArt.color = new Color(1, 1, 1, 1);
+            }
+            else
+            {
+                if (goingRed)
+                {
+                    alertTimer += deltaTime;
+                    if (alertTimer >= 1)
+                    {
+                        goingRed = false;
+                    }
+                }
+                else
+                {
+                    alertTimer -= deltaTime;
+                    if (alertTimer <= 0)
+                    {
+                        goingRed = true;
+                    }
+                }
+
+                shipArt.color = new Color(1, 0.5f + (0.5f * alertTimer), 0.5f + (0.5f * alertTimer), 1);
+            }
+        }
+
+        if (shieldTimer > 0)
+        {
+            shieldTimer -= deltaTime;
+            shieldArt.color = new Color(1, 1, 1, shieldTimer / shieldTimerReset);
+        }
+    }
 
     public virtual void TakeDamage(float damageAmount, Ship attacker)
     {
         if (isAlive)
         {
-            health -= damageAmount;
+            if (shieldHealth > 0)
+            {
+                shieldHealth -= damageAmount;
+                shieldTimer = shieldTimerReset;
+            }
+            else
+            {
+                health -= damageAmount;
+            }
+
             if (!isAlive)
             {
-                SpriteRenderer art = gameObject.GetComponentInChildren<SpriteRenderer>();
-                if (art != null)
-                {  
-                    art.color = new Color(94 / 255f, 79 / 255f, 79 / 255f, 150 / 255f);
+                if (shipArt != null)
+                {
+                    shipArt.color = new Color(94 / 255f, 79 / 255f, 79 / 255f, 150 / 255f);
+                    shieldArt.color = new Color(1, 1, 1, 0);
                 }
+                myBody.drag = 1;
             }
         }
     }
