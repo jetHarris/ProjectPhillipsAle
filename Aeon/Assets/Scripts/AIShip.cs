@@ -12,7 +12,7 @@ public class AIShip : Ship
     //use the same laser math as the player
     //make it so ships can follow the player with that expand thing
     private PlayerManager playerManager;
-    private Ship target;
+    public Ship target;
     private Ship aggressor;
 
     private float slowAngularAngle = 4;
@@ -20,15 +20,15 @@ public class AIShip : Ship
     private float thrustAngle = 20;
     private float shootAngle = 5;
     private float followDistance = 5;
+    private float fireDistance = 6;
 
     private float fleeDistance = 8;
     private float fleeOffsetTime = 0;
     private float fleeOffsetMaxTime = 0;
     private Vector2 fleeOffset;
+    private bool thrusting = false;
 
     private Vector2 targetLocation;
-
-    public List<AIShip> followingShips;
     public enum eState
     {
         Hunting,
@@ -52,7 +52,6 @@ public class AIShip : Ship
         targetLocation = transform.position;
         new Vector2(transform.up.x, transform.up.y);
         shipId = playerManager.AssignShip();
-        followingShips = new List<AIShip>();
         base.LateStart();
     }
 
@@ -127,11 +126,22 @@ public class AIShip : Ship
                         }
                     }
 
-                    AIShip theOtherShip = ((AIShip)target);
-                    if (!target.isAlive || theOtherShip.state == eState.Travelling || theOtherShip.state == eState.Fleeing)
+                    if (target.AIControlled)
                     {
-                        state = eState.Travelling;
-                        theOtherShip.followingShips.Remove(this);
+                        AIShip theOtherShip = ((AIShip)target);
+                        if (!target.isAlive || theOtherShip.state == eState.Travelling || theOtherShip.state == eState.Fleeing)
+                        {
+                            state = eState.Travelling;
+                            theOtherShip.followingShips.Remove(this);
+                        }
+                    }
+                    else
+                    {
+                        if (!target.isAlive)
+                        {
+                            state = eState.Travelling;
+                            target.followingShips.Remove(this);
+                        }
                     }
                 }
                 else
@@ -160,7 +170,10 @@ public class AIShip : Ship
 
                     if (angle < shootAngle && firingTimer == 0)
                     {
-                        FireLaser();
+                        if (distance < fireDistance)
+                        {
+                            FireLaser();
+                        }
 
                         //chance check to see if this turns into a strafing run
                         if (thrustingTime > 0 && Random.Range(0, 50) > 45) //if its moving at a good pace
@@ -307,65 +320,26 @@ public class AIShip : Ship
             }
             break;
         };
-
-        //update any followers
-        int followerCount = followingShips.Count;
-        bool first = true;
-        for (int i = 0; i < followerCount; i++)
-        {
-            if (followingShips[i] == null || followingShips[i].state != eState.Following)
-            {
-                followingShips.RemoveAt(i);
-                break;
-            }
-
-            //if (followerCount > 1)
-            //{
-                followingShips[i].UpdateFollowingTargetLocation(first);
-                first = false;
-            //}
-            //else
-            //{
-                //followingShips[i].UpdateFollowingTargetLocation();
-            //}
-            
-        }
     }
 
     public void UpdateFollowingTargetLocation(bool first = true)
     {
         Vector2 normalizedTargetForward = target.forward.normalized;
         Vector2 targPos = new Vector2(target.transform.position.x, target.transform.position.y);
-        //if (count > 1)
+        if (first)
         {
-            if (first)
-            {
-                targetLocation = targPos +
-                    (normalizedTargetForward * 2) +
-                    (new Vector2(-normalizedTargetForward.y, normalizedTargetForward.x).normalized * 1.4f);
-            }
-            else
-            {
-                targetLocation = targPos +
-                    (normalizedTargetForward * 2) +
-                    (new Vector2(normalizedTargetForward.y, -normalizedTargetForward.x).normalized * 1.4f);
-            }
+            targetLocation = targPos +
+                (normalizedTargetForward * 2) +
+                (new Vector2(-normalizedTargetForward.y, normalizedTargetForward.x).normalized * 1.4f);
         }
-        //else
-        //{
-        //    targetLocation = targPos + 
-        //        normalizedTargetForward * 0.3f;
-        //}
+        else
+        {
+            targetLocation = targPos +
+                (normalizedTargetForward * 2) +
+                (new Vector2(normalizedTargetForward.y, -normalizedTargetForward.x).normalized * 1.4f);
+        }
     }
 
-    //public void TotalFollowerCount(ref int followerCount)
-    //{
-    //    if (followingShips.Count > 0)
-    //    {
-    //        followerCount++;
-    //        followingShips[0].TotalFollowerCount(ref followerCount);
-    //    }
-    //}
     public void AssignShipFollow(AIShip theShip)
     {
         if (followingShips.Count > 0)
@@ -389,36 +363,15 @@ public class AIShip : Ship
         Laser newLaser = (Laser)Instantiate(laserPrefab,
             transform.position + (new Vector3(normalizedForward.x, normalizedForward.y, 0) * -0.02f) + offset,
             transform.rotation);
-        newLaser.velocity = new Vector3(forward.x, forward.y, 0) * 5;
-        newLaser.velocity.x += myBody.velocity.x;
-        newLaser.velocity.y += myBody.velocity.y;
+        newLaser.velocity = new Vector3(forward.x, forward.y, 0) * 15;
         newLaser.ship = this;
         newLaser.damage = 10;
         firingTimer = firingTimerReset;
-        if (followingShips.Count > 1 && state != eState.Following)
+        for (int i = 0; i < followingShips.Count; i++)
         {
-            for (int i = 0; i < followingShips.Count; i++)
-            {
-                followingShips[i].FireLaser();
-            }
+            followingShips[i].FireLaser();
         }
     }
-
-    //public void AssignNewFollowTarget(ref int levels, int targetLevel, AIShip newTarg)
-    //{
-    //    if(levels == targetLevel)
-    //    {
-    //        AIShip otherShip = (AIShip)target;
-    //        otherShip.followingShips.Remove(this);
-    //        target = newTarg;
-    //        newTarg.followingShips.Add(this);
-    //    }
-    //    else
-    //    {
-    //        levels++;
-    //        followingShips[0].AssignNewFollowTarget(ref levels, targetLevel, newTarg);
-    //    }
-    //}
 
     public void FindFollowingPosition(AIShip parent = null)
     {
@@ -431,35 +384,27 @@ public class AIShip : Ship
             followingShips[0].target = null;
             followingShips.RemoveAt(0);
         }
-
-        //else
-        //{
-        //    int leftSideCount = 0;
-        //    otherShip.followingShips[0].TotalFollowerCount(ref leftSideCount);
-
-        //    int rightSideCount = 0;
-        //    otherShip.followingShips[1].TotalFollowerCount(ref rightSideCount);
-
-        //    if (leftSideCount < rightSideCount)
-        //    {
-        //        otherShip.followingShips[0].AssignShipFollow(this);
-        //    }
-        //    else
-        //    {
-        //        otherShip.followingShips[1].AssignShipFollow(this);
-        //    }
-        //}
     }
 
-    public void MoveForward(float deltaTime, float angularDrag, bool thrusting, float modifier = 1)
+    public void MoveForward(float deltaTime, float angularDrag, bool thrustingIn, float modifier = 1)
     {
-        if (thrusting)
+        if (thrustingIn)
         {
+            if (!thrusting)
+            {
+                thrusterArt.enabled = true;
+                thrusting = true;
+            }
             acceleration = deltaTime * speed * Mathf.Min(1, thrustingTime / speedUpTime) * modifier * forward;
             thrustingTime += deltaTime;
         }
         else
         {
+            if (thrusting)
+            {
+                thrusterArt.enabled = false;
+                thrusting = false;
+            }
             acceleration = deltaTime * speed * modifier * forward;
         }
 

@@ -19,9 +19,55 @@ public class PlayerManager : MonoBehaviour {
     public int assignedPlayers;
     public int assignedShips;
     public List<Ship> ships;
+    public AIShip allyShipPrefab;
+    public PlayerController playerPrefab;
+    public static List<Color> teamColours;
 	// Use this for initialization
 	void Start () {
+        teamColours = new List<Color>();
+        teamColours.Add(new Color(111/255f, 195/255f, 223/255f, 1));
+        teamColours.Add(new Color(223/255f, 116/255f, 12/255f, 1));
+    }
 
+    public void CreateWorld(int numEnemies, int numAllies, int numPlayers)
+    {
+        for (int i = 0; i < numEnemies; i++)
+        {
+            AIShip newship = (AIShip)Instantiate(allyShipPrefab,
+            new Vector3(Random.Range(-20, 20), Random.Range(20, 22)),
+            transform.rotation);
+            newship.teamId = 1;
+        }
+
+        for (int i = 0; i < numAllies; i++)
+        {
+            AIShip newship = (AIShip)Instantiate(allyShipPrefab,
+            new Vector3(Random.Range(-20, 20), Random.Range(-20, -22)),
+            transform.rotation);
+            newship.teamId = 0;
+        }
+
+        bool first = true;
+        for (int i = 0; i < numPlayers; i++)
+        {
+            PlayerController newship = (PlayerController)Instantiate(playerPrefab,
+            new Vector3(Random.Range(-20, 20), Random.Range(-20, -22)),
+            transform.rotation);
+            if (first)
+            {
+                //newship.teamId = 1;
+                first = false;
+            }
+        }
+
+        if (numPlayers >= 2)
+        {
+            Camera firstCam = GameObject.Find("camera0").GetComponent<Camera>();
+            firstCam.rect = new Rect(0, 0, 0.5f, 1);
+
+            Camera secondCam = GameObject.Find("camera1").GetComponent<Camera>();
+            secondCam.rect = new Rect(0.5f, 0, 0.5f, 1);
+        }
     }
 
     void Awake()

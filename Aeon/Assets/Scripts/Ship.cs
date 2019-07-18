@@ -26,8 +26,10 @@ public class Ship : MonoBehaviour {
     protected SpriteRenderer shipArt;
     protected SpriteRenderer thrusterArt;
     protected SpriteRenderer shieldArt;
+    protected SpriteRenderer teamColourArt;
     protected float alertTimer = 0;
     protected bool goingRed = true;
+    public List<AIShip> followingShips;
     public bool isAlive
     {
         get { return health > 0; }
@@ -38,6 +40,7 @@ public class Ship : MonoBehaviour {
         firingTimerReset = firingTimer;
         acceleration = new Vector2();
         myBody = gameObject.GetComponent<Rigidbody2D>();
+        followingShips = new List<AIShip>();
     }
 
     protected void LateStart()
@@ -48,6 +51,8 @@ public class Ship : MonoBehaviour {
         thrusterArt.enabled = false;
         shieldArt = Sprites[2];
         shieldArt.color = new Color(1, 1, 1, 0);
+        teamColourArt = Sprites[3];
+        teamColourArt.color = PlayerManager.teamColours[teamId];
     }
 	
 	// Update is called once per frame
@@ -90,6 +95,21 @@ public class Ship : MonoBehaviour {
             shieldTimer -= deltaTime;
             shieldArt.color = new Color(1, 1, 1, shieldTimer / shieldTimerReset);
         }
+
+        //update any followers
+        int followerCount = followingShips.Count;
+        bool first = true;
+        for (int i = 0; i < followerCount; i++)
+        {
+            if (followingShips[i] == null || !followingShips[i].isAlive ||followingShips[i].state != AIShip.eState.Following)
+            {
+                followingShips.RemoveAt(i);
+                break;
+            }
+
+            followingShips[i].UpdateFollowingTargetLocation(first);
+            first = false;
+        }
     }
 
     public virtual void TakeDamage(float damageAmount, Ship attacker)
@@ -110,6 +130,7 @@ public class Ship : MonoBehaviour {
             {
                 if (shipArt != null)
                 {
+                    thrusterArt.enabled = false;
                     shipArt.color = new Color(94 / 255f, 79 / 255f, 79 / 255f, 150 / 255f);
                     shieldArt.color = new Color(1, 1, 1, 0);
                 }

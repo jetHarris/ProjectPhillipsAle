@@ -35,10 +35,12 @@ public class Laser : MonoBehaviour {
             }
             else
             {
-                possibleTarget.TakeDamage(damage, ship);
+                if (possibleTarget.isAlive)
+                {
+                    possibleTarget.TakeDamage(damage, ship);
+                    Destroy(gameObject);
+                }
             }
         }
-
-        Destroy(gameObject);
     }
 }

@@ -1,21 +1,22 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class PlayerController : Ship {
     GameObject self;
     int playerId;
     Camera trackingCamera;
+    GameObject trackingBackground;
     Vector3 cameraOffset = new Vector3(0, 0, -10);
+    Vector3 backgroundOffset = new Vector3(10, 10, 1);
     private GameObject playerManagerObject;
     private PlayerManager playerManager;
     PlayerManager.Player player;
     private bool lastDirectionForward = true;
-    private float deathTime = 0;
-    private float deathTimeMax = 3;
     bool thrusting = false;
     bool stabilizing = true;
-
+    protected SpriteRenderer selecterArt;
 
     // Use this for initialization
     void Start () {
@@ -35,6 +36,9 @@ public class PlayerController : Ship {
 
         //getting the camera
         trackingCamera = GameObject.Find("camera" + playerId).GetComponent<Camera>();
+
+        //getting the background
+        trackingBackground = GameObject.Find("backgroundSprite" + playerId);
 
         firingTimerReset = firingTimer;
         playerManager.ships.Add(this);
@@ -63,28 +67,24 @@ public class PlayerController : Ship {
         
         if (!isAlive)
         {
-            deathTime += deltaTime;
-            if (deathTime > deathTimeMax)
-            {
-                TakeOverOtherShip();
-            }
             return;
         }
         CustomUpdate();
 
-        Vector3 normalizedVel3 = myBody.velocity.normalized;
-        float magnitude = myBody.velocity.magnitude;
-        //float slowDown = 1;
-        //the come back to the player has to be slowed down somehow
-        //if (magnitude > 0)
-        trackingCamera.transform.position = (transform.position + cameraOffset);// +
-            //(normalizedVel3 * -((magnitude/maxSpeed)* maxCameraAway)) * slowDown;
+        trackingCamera.transform.position = (transform.position + cameraOffset);
+
+        trackingBackground.transform.position = (transform.position + backgroundOffset);
 
         bool pressed = false;
         
-        
         forward.x = transform.up.x;
         forward.y = transform.up.y;
+
+        //find nearby ships and make them follow you
+        if (Input.GetButton("A_P" + playerId) && followingShips.Count < 2)
+        {
+            MakeShipsFollow();
+        }
 
         float cancelStabilizer = Input.GetAxis("LeftTrigger_P" + playerId);
         if (cancelStabilizer > 0 && stabilizing)
@@ -134,31 +134,14 @@ public class PlayerController : Ship {
 
         if (Input.GetButton("B_P" + playerId) && firingTimer == 0)
         {
-            Vector2 normalizedForward = forward.normalized;
-            Vector3 offset = fireRight ? new Vector3(-normalizedForward.y, normalizedForward.x, 0).normalized * 0.65f :
-                new Vector3(normalizedForward.y, -normalizedForward.x, 0).normalized * 0.65f;
-            fireRight = !fireRight;
-
-            Laser newLaser = (Laser)Instantiate(laserPrefab,
-                transform.position + (new Vector3(normalizedForward.x, normalizedForward.y, 0) * -0.02f) + offset,
-                transform.rotation);
-
-            newLaser.velocity = new Vector3(forward.x, forward.y, 0) * 15;
-            float theDot = Vector2.Dot(myBody.velocity, forward);
-            if (theDot > 0)
-            {
-                newLaser.velocity.x += myBody.velocity.x * (theDot / 4.8f);
-                newLaser.velocity.y += myBody.velocity.y * (theDot / 4.8f);
-            }
-            newLaser.ship = this;
-            newLaser.damage = 10;
-            firingTimer = firingTimerReset;
+            FireLaser();
         }
 
-        //debug do damage to self
+        //debug to reset the scene
         if (Input.GetButton("X_P" + playerId))
         {
-            TakeDamage(999, this);
+            Scene scene = SceneManager.GetActiveScene();
+            SceneManager.LoadScene(scene.name);
         }
 
         float turningAxis = Input.GetAxis("LeftJoystickX_P" + playerId);
@@ -197,35 +180,78 @@ public class PlayerController : Ship {
         }
     }
 
-    public override void TakeDamage(float damageAmount, Ship attacker)
+    public void FireLaser()
     {
-        base.TakeDamage(damageAmount, attacker);
+        Vector2 normalizedForward = forward.normalized;
+        Vector3 offset = fireRight ? new Vector3(-normalizedForward.y, normalizedForward.x, 0).normalized * 0.65f :
+            new Vector3(normalizedForward.y, -normalizedForward.x, 0).normalized * 0.65f;
+        fireRight = !fireRight;
+
+        Laser newLaser = (Laser)Instantiate(laserPrefab,
+            transform.position + (new Vector3(normalizedForward.x, normalizedForward.y, 0) * -0.02f) + offset,
+            transform.rotation);
+
+        newLaser.velocity = new Vector3(forward.x, forward.y, 0) * 15;
+        float theDot = Vector2.Dot(myBody.velocity, forward);
+        if (theDot > 0)
+        {
+            //newLaser.velocity.x += myBody.velocity.x * (theDot / maxSpeed);
+            //newLaser.velocity.y += myBody.velocity.y * (theDot / maxSpeed);
+        }
+        newLaser.ship = this;
+        newLaser.damage = 10;
+        firingTimer = firingTimerReset;
+
+        for (int i = 0; i < followingShips.Count; i++)
+        {
+            followingShips[i].FireLaser();
+        }
     }
 
-    private void TakeOverOtherShip()
+    private void MakeShipsFollow()
     {
-        //take over an AI ship somehow
+        List<Ship> nearestShips = new List<Ship>();
         int shipNum = playerManager.ships.Count;
         for (int i = 0; i < shipNum; i++)
         {
-            Ship temp = playerManager.ships[i];
-            if (temp != this && temp.isAlive && temp.teamId == teamId)
+            if (playerManager.ships[i].AIControlled)
             {
-                myBody.velocity = temp.myBody.velocity;
-                myBody.angularDrag = temp.myBody.angularDrag;
-                myBody.angularVelocity = temp.myBody.angularVelocity;
-                transform.position = temp.transform.position;
-                transform.rotation = temp.transform.rotation;
-                health = temp.health;
-                if (shipArt != null)
+                AIShip temp = (AIShip)playerManager.ships[i];
+                if (temp.isAlive &&
+                    temp.teamId == teamId)
                 {
-                    shipArt.color = new Color(1, 1, 1, 1);
+                    if (Vector2.Distance(temp.transform.position, transform.position) < 3)
+                    {
+                        nearestShips.Add(temp);
+                        if (nearestShips.Count >= 2)
+                        {
+                            break;
+                        }
+                    }
                 }
-                Destroy(temp.gameObject);
-                deathTime = 0;
-                playerManager.ships.RemoveAt(i);
-                break;
             }
         }
+
+        for (int i = 0; i < nearestShips.Count; i++)
+        {
+            AIShip temp = (AIShip)nearestShips[i];
+            temp.state = AIShip.eState.Following;
+            temp.target = this;
+            followingShips.Add(temp);
+            if (temp.followingShips.Count > 0)
+            {
+                for (int j = 0; j < temp.followingShips.Count; j++)
+                {
+                    AIShip subShip = (AIShip)temp.followingShips[j];
+                    subShip.target = null;
+                    subShip.state = AIShip.eState.Travelling;
+                }
+            }
+        }
+    }
+
+    public override void TakeDamage(float damageAmount, Ship attacker)
+    {
+        base.TakeDamage(damageAmount, attacker);
     }
 }
