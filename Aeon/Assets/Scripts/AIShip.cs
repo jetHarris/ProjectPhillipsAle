@@ -496,14 +496,22 @@ public class AIShip : Ship
                 };
             }
         }
-        else
-        {
-            playerManager.ships.Remove(this);
-        }
+    }
+
+    public override void Die()
+    {
+        base.Die();
+        playerManager.ships.Remove(this);
+        Instantiate(explosionPrefab, transform.position, transform.rotation);
+        Destroy(gameObject);
     }
 
     public void RecalulateFleeOffset()
     {
+        if (aggressor == null)
+        {
+            return;
+        }
         Vector2 targetDirection = new Vector2(aggressor.transform.position.x, aggressor.transform.position.y) -
             new Vector2(transform.position.x, transform.position.y);
         float coinToss = Random.Range(0, 2);

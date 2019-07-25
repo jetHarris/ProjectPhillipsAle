@@ -9,9 +9,25 @@ public class Laser : MonoBehaviour {
     private float maxLifetime = 10;
     private float currentLifetime = 0;
     public float damage;
-	// Use this for initialization
+    public enum eLaserType
+    {
+        Regular,
+        Big
+    }
+
+    public eLaserType type;
+
 	void Start () {
-		
+        if (PlayerManager.laserSoundCooldown <= 0 || !ship.AIControlled)
+        {
+            AudioSource sound = GetComponent<AudioSource>();
+            if (sound != null)
+            {
+                sound.Play();
+                PlayerManager.laserSoundCooldown = 0.2f;
+            }
+            
+        }
 	}
 	
 	// Update is called once per frame
@@ -38,7 +54,10 @@ public class Laser : MonoBehaviour {
                 if (possibleTarget.isAlive)
                 {
                     possibleTarget.TakeDamage(damage, ship);
-                    Destroy(gameObject);
+                    if (type != eLaserType.Big)
+                    {
+                        Destroy(gameObject);
+                    }
                 }
             }
         }

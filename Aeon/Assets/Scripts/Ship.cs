@@ -4,6 +4,7 @@ using UnityEngine;
 
 public class Ship : MonoBehaviour {
     public Laser laserPrefab;
+    public Laser chargedLaserPrefab;
     protected float firingTimer = 0.2f;
     protected float firingTimerReset;
     protected float maxSpeed = 5;
@@ -27,9 +28,11 @@ public class Ship : MonoBehaviour {
     protected SpriteRenderer thrusterArt;
     protected SpriteRenderer shieldArt;
     protected SpriteRenderer teamColourArt;
+    protected SpriteRenderer miniMapArt;
     protected float alertTimer = 0;
-    protected bool goingRed = true;
+    protected const float ALERT_TIME_MAX = 1;
     public List<AIShip> followingShips;
+    public Explosion explosionPrefab;
     public bool isAlive
     {
         get { return health > 0; }
@@ -53,6 +56,9 @@ public class Ship : MonoBehaviour {
         shieldArt.color = new Color(1, 1, 1, 0);
         teamColourArt = Sprites[3];
         teamColourArt.color = PlayerManager.teamColours[teamId];
+        //minimap display
+        miniMapArt = Sprites[4];
+        miniMapArt.color = PlayerManager.teamColours[teamId];
     }
 	
 	// Update is called once per frame
@@ -67,26 +73,10 @@ public class Ship : MonoBehaviour {
                 shieldHealth = 40;
                 shipArt.color = new Color(1, 1, 1, 1);
             }
-            else
+            else if (alertTimer > 0)
             {
-                if (goingRed)
-                {
-                    alertTimer += deltaTime;
-                    if (alertTimer >= 1)
-                    {
-                        goingRed = false;
-                    }
-                }
-                else
-                {
-                    alertTimer -= deltaTime;
-                    if (alertTimer <= 0)
-                    {
-                        goingRed = true;
-                    }
-                }
-
-                shipArt.color = new Color(1, 0.5f + (0.5f * alertTimer), 0.5f + (0.5f * alertTimer), 1);
+                alertTimer -= deltaTime;
+                shipArt.color = new Color(1, (1-(alertTimer/ ALERT_TIME_MAX)),(1-(alertTimer/ ALERT_TIME_MAX)), 1);
             }
         }
 
@@ -120,10 +110,16 @@ public class Ship : MonoBehaviour {
             {
                 shieldHealth -= damageAmount;
                 shieldTimer = shieldTimerReset;
+                //damage bleed through on by default currently
+                if (shieldHealth < 0)
+                {
+                    health += shieldHealth;
+                }
             }
             else
             {
                 health -= damageAmount;
+                alertTimer = ALERT_TIME_MAX;
             }
 
             if (!isAlive)
@@ -133,9 +129,16 @@ public class Ship : MonoBehaviour {
                     thrusterArt.enabled = false;
                     shipArt.color = new Color(94 / 255f, 79 / 255f, 79 / 255f, 150 / 255f);
                     shieldArt.color = new Color(1, 1, 1, 0);
+                    miniMapArt.enabled = false;
                 }
                 myBody.drag = 1;
+                Die();
             }
         }
+    }
+
+    public virtual void Die()
+    {
+
     }
 }

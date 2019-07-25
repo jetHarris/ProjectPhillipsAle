@@ -2,12 +2,14 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 public class PlayerController : Ship {
     GameObject self;
     int playerId;
     Camera trackingCamera;
     GameObject trackingBackground;
+    Material trackingBackgroundSprite;
     Vector3 cameraOffset = new Vector3(0, 0, -10);
     Vector3 backgroundOffset = new Vector3(10, 10, 1);
     private GameObject playerManagerObject;
@@ -17,12 +19,18 @@ public class PlayerController : Ship {
     bool thrusting = false;
     bool stabilizing = true;
     protected SpriteRenderer selecterArt;
+    float chargingTimer = 0;
+    float startingHealth = 0;
+    float startingShield = 0;
+    float currentScroll = 0;
 
     // Use this for initialization
     void Start () {
         acceleration = new Vector2();
         myBody = gameObject.GetComponent<Rigidbody2D>();
         health = 60;
+        startingHealth = health;
+        startingShield = shieldHealth;
         speed = 5500;
         maxSpeed = 5;
 
@@ -39,6 +47,7 @@ public class PlayerController : Ship {
 
         //getting the background
         trackingBackground = GameObject.Find("backgroundSprite" + playerId);
+        trackingBackgroundSprite = trackingBackground.GetComponentInChildren<SpriteRenderer>().material;
 
         firingTimerReset = firingTimer;
         playerManager.ships.Add(this);
@@ -51,18 +60,56 @@ public class PlayerController : Ship {
     {
 
     }
-	
-	// Update is called once per frame
-	void FixedUpdate () {
+
+    private void Update()
+    {
+        float deltaTime = Time.deltaTime;
+        if (Input.GetButtonDown("B_P" + playerId) && firingTimer == 0 && chargingTimer == 0)
+        {
+            FireLaser();
+        }
+        else if (Input.GetButton("B_P" + playerId))
+        {
+            chargingTimer += deltaTime;
+        }
+        else if (Input.GetButtonUp("B_P" + playerId) && chargingTimer > 0)
+        {
+            FireLaser();
+        }
+
+        //minimap
+        if (Input.GetButtonDown("Back_P" + playerId))
+        {
+            UI.Instance.MinimapEnableDisable(playerId, true);
+        }
+        else if (Input.GetButtonUp("Back_P" + playerId))
+        {
+            UI.Instance.MinimapEnableDisable(playerId, false);
+        }
+
+        UI.Instance.UpdatePlayerStatus(playerId, health/startingHealth, shieldHealth/startingShield, 0);
+    }
+
+    // Update is called once per frame
+    void FixedUpdate () {
         //revive cheat currently
-        if (Input.GetButton("Y_P" + playerId))
+        if (Input.GetButton("Start_P" + playerId))
         {
             health = 999;
             if (shipArt != null)
             {
                 shipArt.color = new Color(1, 1, 1, 1);
+                miniMapArt.enabled = true;
             }
         }
+
+        //debug to reset the scene
+        if (Input.GetButton("X_P" + playerId))
+        {
+            Scene scene = SceneManager.GetActiveScene();
+            SceneManager.LoadScene(scene.name);
+        }
+
         float deltaTime = Time.deltaTime;
         
         if (!isAlive)
@@ -72,8 +119,14 @@ public class PlayerController : Ship {
         CustomUpdate();
 
         trackingCamera.transform.position = (transform.position + cameraOffset);
+        trackingCamera.orthographicSize = 7 - Mathf.Min(myBody.velocity.magnitude, 2);
 
         trackingBackground.transform.position = (transform.position + backgroundOffset);
+        currentScroll += Time.deltaTime;
+        trackingBackgroundSprite.mainTextureOffset = new Vector2(currentScroll, currentScroll);
+        //float ratio = 0.003f;
+        //trackingBackground.transform.localScale = (new Vector3(1, 1, 1) +
+        //    new Vector3(myBody.velocity.x, myBody.velocity.y, 0) * ratio);
 
         bool pressed = false;
         
@@ -81,7 +134,7 @@ public class PlayerController : Ship {
         forward.y = transform.up.y;
 
         //find nearby ships and make them follow you
-        if (Input.GetButton("A_P" + playerId) && followingShips.Count < 2)
+        if (Input.GetAxis("LeftRightD_P" + playerId) > 0.5 && followingShips.Count < 2)
         {
             MakeShipsFollow();
         }
@@ -132,18 +185,6 @@ public class PlayerController : Ship {
             }
         }
 
-        if (Input.GetButton("B_P" + playerId) && firingTimer == 0)
-        {
-            FireLaser();
-        }
-
-        //debug to reset the scene
-        if (Input.GetButton("X_P" + playerId))
-        {
-            Scene scene = SceneManager.GetActiveScene();
-            SceneManager.LoadScene(scene.name);
-        }
-
         float turningAxis = Input.GetAxis("LeftJoystickX_P" + playerId);
         if (turningAxis != 0)
         {
@@ -187,19 +228,33 @@ public class PlayerController : Ship {
             new Vector3(normalizedForward.y, -normalizedForward.x, 0).normalized * 0.65f;
         fireRight = !fireRight;
 
-        Laser newLaser = (Laser)Instantiate(laserPrefab,
-            transform.position + (new Vector3(normalizedForward.x, normalizedForward.y, 0) * -0.02f) + offset,
-            transform.rotation);
-
-        newLaser.velocity = new Vector3(forward.x, forward.y, 0) * 15;
-        float theDot = Vector2.Dot(myBody.velocity, forward);
-        if (theDot > 0)
+        if (chargingTimer < 0.2f)
         {
-            //newLaser.velocity.x += myBody.velocity.x * (theDot / maxSpeed);
-            //newLaser.velocity.y += myBody.velocity.y * (theDot / maxSpeed);
+            Laser newLaser = (Laser)Instantiate(laserPrefab,
+                transform.position + (new Vector3(normalizedForward.x, normalizedForward.y, 0) * -0.02f) + offset,
+                transform.rotation);
+
+            newLaser.velocity = new Vector3(forward.x, forward.y, 0) * 15;
+            //float theDot = Vector2.Dot(myBody.velocity, forward);
+            //if (theDot > 0)
+            //{
+            //    //newLaser.velocity.x += myBody.velocity.x * (theDot / maxSpeed);
+            //    //newLaser.velocity.y += myBody.velocity.y * (theDot / maxSpeed);
+            //}
+            newLaser.ship = this;
+            newLaser.damage = 10;
         }
-        newLaser.ship = this;
-        newLaser.damage = 10;
+        else
+        {
+            Laser newLaser = (Laser)Instantiate(chargedLaserPrefab,
+                transform.position + (new Vector3(normalizedForward.x, normalizedForward.y, 0) * 0.8f),
+                transform.rotation);
+            newLaser.velocity = new Vector3(forward.x, forward.y, 0) * 8;
+            newLaser.ship = this;
+            newLaser.damage = 100;
+        }
+        chargingTimer = 0;
+
         firingTimer = firingTimerReset;
 
         for (int i = 0; i < followingShips.Count; i++)

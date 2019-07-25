@@ -15,6 +15,8 @@ public class PlayerManager : MonoBehaviour {
         }
     }
 
+    public static float laserSoundCooldown = 0.2f;
+
     public List<Player> players;
     public int assignedPlayers;
     public int assignedShips;
@@ -56,6 +58,8 @@ public class PlayerManager : MonoBehaviour {
             if (first)
             {
                 //newship.teamId = 1;
+                //newship.transform.position = new Vector3(newship.transform.position.x,
+                //    20, 0);
                 first = false;
             }
         }
@@ -113,8 +117,11 @@ public class PlayerManager : MonoBehaviour {
 	
 	// Update is called once per frame
 	void Update () {
-		
-	}
+        if (laserSoundCooldown >= 0)
+        {
+            laserSoundCooldown -= Time.deltaTime;
+        }
+    }
 }
 
 

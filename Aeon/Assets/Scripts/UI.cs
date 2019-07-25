@@ -5,6 +5,7 @@ using UnityEngine.UI;
 
 public class UI : MonoBehaviour {
 
+    static UI mInstance;
     public PlayerManager playerManager;
     public Text enemyNumText;
     public Text enemyNumTextPrompt;
@@ -14,6 +15,8 @@ public class UI : MonoBehaviour {
     private int allyNum = 0;
     public Text playerNumText;
     public Text playerNumTextPrompt;
+    public GameObject firstMinimap;
+    public GameObject secondMinimap;
     private int playerNum = 1;
     public bool gameStarted = false;
     
@@ -22,6 +25,8 @@ public class UI : MonoBehaviour {
     private float inputNumChangeDelayReset;
 
     private float numSwitchDelay = 0;
+
+    private List<PlayerStatusUI> playerStatuses;
 
     private enum eSelectedNum
     {
@@ -32,12 +37,28 @@ public class UI : MonoBehaviour {
 
     private eSelectedNum selectedNum = eSelectedNum.enemy;
 
+    public static UI Instance
+    {
+        get
+        {
+            if (mInstance == null) mInstance = new UI();
+            return mInstance;
+        }
+    }
+
     // Use this for initialization
     void Start () {
         enemyNumTextPrompt.color = new Color(1, 0, 0, 1);
         enemyNumText.color = new Color(1, 0, 0, 1);
 
         inputNumChangeDelayReset = inputNumChangeDelay;
+
+        playerStatuses = new List<PlayerStatusUI>();
+        playerStatuses.Add(GameObject.Find("Status_P0").GetComponent<PlayerStatusUI>());
+        mInstance = this;
+
+        firstMinimap.SetActive(false);
+        secondMinimap.SetActive(false);
     }
 
     void SwitchText(float upDownIn)
@@ -131,9 +152,9 @@ public class UI : MonoBehaviour {
                 {
                     allyNum = 0;
                 }
-                else if (allyNum > 50)
+                else if (allyNum > 1000)
                 {
-                    allyNum = 50;
+                    allyNum = 1000;
                 }
                 allyNumText.text = allyNum.ToString();
             }
@@ -145,9 +166,9 @@ public class UI : MonoBehaviour {
                 {
                     enemyNum = 0;
                 }
-                else if (enemyNum > 50)
+                else if (enemyNum > 1000)
                 {
-                    enemyNum = 50;
+                    enemyNum = 1000;
                 }
                 enemyNumText.text = enemyNum.ToString();
             }
@@ -219,7 +240,38 @@ public class UI : MonoBehaviour {
             playerNumText.enabled = false;
             playerNumTextPrompt.enabled = false;
 
+            if (playerNum > 1)
+            {
+                GameObject UIStatus = GameObject.Find("Status_P0");
+                Vector3 newPos = UIStatus.transform.position;
+                newPos.x += 500;
+                GameObject newStatus = Instantiate(UIStatus, newPos, UIStatus.transform.rotation);
+                newStatus.transform.SetParent(UIStatus.transform.parent);
+                playerStatuses.Add(newStatus.GetComponent<PlayerStatusUI>());
+
+                Vector3 newMiniPos = firstMinimap.transform.position;
+                newMiniPos.x -= 300;
+                firstMinimap.transform.position = newMiniPos;
+            }
+
             playerManager.CreateWorld(enemyNum, allyNum, playerNum);
+        }
+    }
+
+    public void UpdatePlayerStatus(int playerId, float healthRatio, float shieldRatio, int ammo)
+    {
+        playerStatuses[playerId].UpdatePlayerStatus(healthRatio, shieldRatio, ammo);
+    }
+
+    public void MinimapEnableDisable(int playerId, bool enable)
+    {
+        if (playerId == 0)
+        {
+            firstMinimap.SetActive(enable);
+        }
+        else
+        {
+            secondMinimap.SetActive(enable);
         }
     }
 }
