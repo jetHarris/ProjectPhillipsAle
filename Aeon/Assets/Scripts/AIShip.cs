@@ -4,13 +4,7 @@ using UnityEngine;
 
 public class AIShip : Ship
 {
-    //Joce notes
-    //todo
-    //dont just activate strafe on firing
-    //have variable or increase of pursue distance
-
     //use the same laser math as the player
-    //make it so ships can follow the player with that expand thing
     private PlayerManager playerManager;
     public Ship target;
     private Ship aggressor;
@@ -27,6 +21,7 @@ public class AIShip : Ship
     private float fleeOffsetMaxTime = 0;
     private Vector2 fleeOffset;
     private bool thrusting = false;
+    private bool animThrusting = false; //Awful, take this out as soon as more state logic has been put in
 
     private Vector2 targetLocation;
     public enum eState
@@ -124,6 +119,12 @@ public class AIShip : Ship
                         {
                             MoveForward(deltaTime, 1.5f, false, 0.2f);
                         }
+                        else if (animThrusting)
+                        {
+                            thrusterAnim.SetBool("IsStarting", false);
+                            thrusterAnim.SetBool("IsEnding", true);
+                            animThrusting = false;
+                        }
                     }
 
                     if (target.AIControlled)
@@ -176,7 +177,7 @@ public class AIShip : Ship
                         }
 
                         //chance check to see if this turns into a strafing run
-                        if (thrustingTime > 0 && Random.Range(0, 50) > 45) //if its moving at a good pace
+                        if (thrustingTime > 0 && Random.Range(0, 50) > 49) //if its moving at a good pace
                         {
                             float coinToss = Random.Range(0, 2);
                             if (coinToss >= 1)
@@ -207,6 +208,12 @@ public class AIShip : Ship
                         if (distance > followDistance / 2)
                         {
                             MoveForward(deltaTime, 1.5f, false, 0.2f);
+                        }
+                        else if (animThrusting)
+                        {
+                            thrusterAnim.SetBool("IsStarting", false);
+                            thrusterAnim.SetBool("IsEnding", true);
+                            animThrusting = false;
                         }
                     }
 
@@ -366,6 +373,7 @@ public class AIShip : Ship
         newLaser.velocity = new Vector3(forward.x, forward.y, 0) * 15;
         newLaser.ship = this;
         newLaser.damage = 10;
+        newLaser.LateStart();
         firingTimer = firingTimerReset;
         for (int i = 0; i < followingShips.Count; i++)
         {
@@ -388,11 +396,17 @@ public class AIShip : Ship
 
     public void MoveForward(float deltaTime, float angularDrag, bool thrustingIn, float modifier = 1)
     {
+        if (!animThrusting)
+        {
+            thrusterAnim.SetBool("IsStarting", true);
+            thrusterAnim.SetBool("IsEnding", false);
+            animThrusting = true;
+        }
+
         if (thrustingIn)
         {
             if (!thrusting)
             {
-                thrusterArt.enabled = true;
                 thrusting = true;
             }
             acceleration = deltaTime * speed * Mathf.Min(1, thrustingTime / speedUpTime) * modifier * forward;
@@ -402,7 +416,6 @@ public class AIShip : Ship
         {
             if (thrusting)
             {
-                thrusterArt.enabled = false;
                 thrusting = false;
             }
             acceleration = deltaTime * speed * modifier * forward;

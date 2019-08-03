@@ -19,9 +19,10 @@ public class PlayerStatusUI : MonoBehaviour {
 		
 	}
 
-    public void UpdatePlayerStatus(float healthRatio, float shieldRatio, int ammo)
+    public void UpdatePlayerStatus(float healthRatio, float shieldRatio, float ammoRatio)
     {
         healthBar.fillAmount = healthRatio;
         shieldBar.fillAmount = shieldRatio;
+        ammoBar.fillAmount = ammoRatio;
     }
 }

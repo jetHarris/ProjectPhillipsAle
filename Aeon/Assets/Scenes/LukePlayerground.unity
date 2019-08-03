@@ -2323,6 +2323,8 @@ MonoBehaviour:
   playerNumTextPrompt: {fileID: 351741287}
   firstMinimap: {fileID: 1582993731}
   secondMinimap: {fileID: 845561411}
+  shoutPrefab: {fileID: 114890370552932808, guid: 0fc6d2edf845d7949ae8e032c0e9496b,
+    type: 2}
   gameStarted: 0
 --- !u!114 &2036740800
 MonoBehaviour:

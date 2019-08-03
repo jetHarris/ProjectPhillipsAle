@@ -17,6 +17,7 @@ public class UI : MonoBehaviour {
     public Text playerNumTextPrompt;
     public GameObject firstMinimap;
     public GameObject secondMinimap;
+    public Shout shoutPrefab;
     private int playerNum = 1;
     public bool gameStarted = false;
     
@@ -258,9 +259,9 @@ public class UI : MonoBehaviour {
         }
     }
 
-    public void UpdatePlayerStatus(int playerId, float healthRatio, float shieldRatio, int ammo)
+    public void UpdatePlayerStatus(int playerId, float healthRatio, float shieldRatio, float ammoRatio)
     {
-        playerStatuses[playerId].UpdatePlayerStatus(healthRatio, shieldRatio, ammo);
+        playerStatuses[playerId].UpdatePlayerStatus(healthRatio, shieldRatio, ammoRatio);
     }
 
     public void MinimapEnableDisable(int playerId, bool enable)
@@ -273,5 +274,22 @@ public class UI : MonoBehaviour {
         {
             secondMinimap.SetActive(enable);
         }
+    }
+
+    public void Shout(int playerId, string text)
+    {
+        Vector3 newPos = new Vector3(512, 230, 0);
+        if (playerId == 1)
+        {
+            newPos = new Vector3(720, 230, 0);
+        }
+        else if (playerId == 0 && playerNum > 1)
+        {
+            newPos = new Vector3(250, 230, 0);
+        }
+
+        Shout newShout = Instantiate(shoutPrefab, newPos, new Quaternion());
+        newShout.GetComponentInChildren<Text>().text = text;
+        newShout.transform.SetParent(this.transform);
     }
 }

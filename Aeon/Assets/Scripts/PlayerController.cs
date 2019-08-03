@@ -9,7 +9,6 @@ public class PlayerController : Ship {
     int playerId;
     Camera trackingCamera;
     GameObject trackingBackground;
-    Material trackingBackgroundSprite;
     Vector3 cameraOffset = new Vector3(0, 0, -10);
     Vector3 backgroundOffset = new Vector3(10, 10, 1);
     private GameObject playerManagerObject;
@@ -17,22 +16,56 @@ public class PlayerController : Ship {
     PlayerManager.Player player;
     private bool lastDirectionForward = true;
     bool thrusting = false;
-    bool stabilizing = true;
     protected SpriteRenderer selecterArt;
+    protected SpriteRenderer pullArt;
     float chargingTimer = 0;
     float startingHealth = 0;
     float startingShield = 0;
-    float currentScroll = 0;
+    float shoutCooldown = 0.8f;
+    float boostSpeedModifier = 1;
+    float boostAmount = 100;
+    float boostStartingAmount;
+    float notUsingBoostTimer = 0;
+
+    [System.Flags] public enum eShipState
+    {
+        None = 0,
+        Boosting = 1,
+        Thrusting = 2,
+        ChargingSecondary = 3,
+        Stabilizing = 4,
+    }
+
+    public eShipState state;
+
+    public bool HasFlag(eShipState flag)
+    {
+        return (state & flag) != 0;
+    }
+
+    public void AddFlag(eShipState flag)
+    {
+        state |= flag;
+    }
+
+    public void RemoveFlag(eShipState flag)
+    {
+        state &= ~flag;
+    }
 
     // Use this for initialization
     void Start () {
+        state = eShipState.None;
         acceleration = new Vector2();
         myBody = gameObject.GetComponent<Rigidbody2D>();
         health = 60;
         startingHealth = health;
         startingShield = shieldHealth;
-        speed = 5500;
+        boostStartingAmount = boostAmount;
+        speed = 2000;
         maxSpeed = 5;
+        speedUpTime = 4f;
+        myBody.drag = 0;
 
         playerManagerObject = GameObject.Find("PlayerManagerMain");
         //get playerId from the PlayerManager
@@ -47,13 +80,16 @@ public class PlayerController : Ship {
 
         //getting the background
         trackingBackground = GameObject.Find("backgroundSprite" + playerId);
-        trackingBackgroundSprite = trackingBackground.GetComponentInChildren<SpriteRenderer>().material;
 
         firingTimerReset = firingTimer;
         playerManager.ships.Add(this);
         forward = new Vector2(transform.up.x, transform.up.y);
 
         base.LateStart();
+
+        var Sprites = gameObject.GetComponentsInChildren<SpriteRenderer>();
+        pullArt = Sprites[5];
+        pullArt.enabled = false;
     }
 
     void Awake()
@@ -64,17 +100,22 @@ public class PlayerController : Ship {
     private void Update()
     {
         float deltaTime = Time.deltaTime;
-        if (Input.GetButtonDown("B_P" + playerId) && firingTimer == 0 && chargingTimer == 0)
+        if (isAlive)
         {
-            FireLaser();
-        }
-        else if (Input.GetButton("B_P" + playerId))
-        {
-            chargingTimer += deltaTime;
-        }
-        else if (Input.GetButtonUp("B_P" + playerId) && chargingTimer > 0)
-        {
-            FireLaser();
+            float shoot = Input.GetAxis("RightTrigger_P" + playerId);
+            if (shoot > 0 && firingTimer == 0)
+            {
+                FireLaser(false);
+            }
+
+            if (Input.GetButton("Y_P" + playerId))
+            {
+                chargingTimer += deltaTime;
+            }
+            else if (chargingTimer > 0)
+            {
+                FireLaser(true);
+            }
         }
 
         //minimap
@@ -87,7 +128,7 @@ public class PlayerController : Ship {
             UI.Instance.MinimapEnableDisable(playerId, false);
         }
 
-        UI.Instance.UpdatePlayerStatus(playerId, health/startingHealth, shieldHealth/startingShield, 0);
+        UI.Instance.UpdatePlayerStatus(playerId, health/startingHealth, shieldHealth/startingShield, boostAmount/boostStartingAmount);
     }
 
     // Update is called once per frame
@@ -119,59 +160,71 @@ public class PlayerController : Ship {
         CustomUpdate();
 
         trackingCamera.transform.position = (transform.position + cameraOffset);
-        trackingCamera.orthographicSize = 7 - Mathf.Min(myBody.velocity.magnitude, 2);
 
         trackingBackground.transform.position = (transform.position + backgroundOffset);
-        currentScroll += Time.deltaTime;
-        trackingBackgroundSprite.mainTextureOffset = new Vector2(currentScroll, currentScroll);
-        //float ratio = 0.003f;
-        //trackingBackground.transform.localScale = (new Vector3(1, 1, 1) +
-        //    new Vector3(myBody.velocity.x, myBody.velocity.y, 0) * ratio);
 
         bool pressed = false;
         
         forward.x = transform.up.x;
         forward.y = transform.up.y;
 
-        //find nearby ships and make them follow you
-        if (Input.GetAxis("LeftRightD_P" + playerId) > 0.5 && followingShips.Count < 2)
+        //shouting commands
+        if (shoutCooldown > 0)
         {
+            shoutCooldown -= deltaTime;
+        }
+        //find nearby ships and make them follow you
+        if (Input.GetAxis("LeftRightD_P" + playerId) > 0.5 && followingShips.Count < 2 && shoutCooldown <= 0)
+        {
+            UI.Instance.Shout(playerId, "Follow");
             MakeShipsFollow();
+            shoutCooldown = 0.8f;
         }
 
-        float cancelStabilizer = Input.GetAxis("LeftTrigger_P" + playerId);
-        if (cancelStabilizer > 0 && stabilizing)
+        //tell nearby ships to break off
+        if (Input.GetAxis("LeftRightD_P" + playerId) < -0.5 && followingShips.Count > 0 && shoutCooldown <= 0)
         {
-            stabilizing = false;
+            UI.Instance.Shout(playerId, "Break Off");
+            for (int i = followingShips.Count-1; i > -1; i--)
+            {
+                followingShips[i].target = null;
+                followingShips[i].state = AIShip.eState.Travelling;
+                followingShips.RemoveAt(i);
+            }
+            shoutCooldown = 0.8f;
+        }
+
+        //turning on and off the stabilizers
+        float stabilizer = Input.GetAxis("LeftJoystickY_P" + playerId);
+        if (stabilizer > 0.5 && !HasFlag(eShipState.Stabilizing))
+        {
+            AddFlag(eShipState.Stabilizing);
+            myBody.drag = 1.4f;
+        }
+        else if (stabilizer <= 0.5 && HasFlag(eShipState.Stabilizing))
+        {
+            RemoveFlag(eShipState.Stabilizing);
             myBody.drag = 0;
         }
-        else if (cancelStabilizer == 0 && !stabilizing)
-        {
-            stabilizing = true;
-            myBody.drag = 3;
-        }
 
-        float propulsion = Input.GetAxis("RightTrigger_P" + playerId);
+        float propulsion = Input.GetAxis("LeftTrigger_P" + playerId);
         if (propulsion > 0)
         {
-            acceleration = deltaTime * speed * propulsion * Mathf.Min(1, thrustingTime/speedUpTime) * forward;
+            acceleration = deltaTime * speed * propulsion * Mathf.Max(0.5f,Mathf.Clamp(thrustingTime/speedUpTime,0,1)) * forward;
             pressed = true;
             if (!thrusting)
             {
-                thrusterArt.enabled = true;
+                thrusterAnim.SetBool("IsStarting", true);
+                thrusterAnim.SetBool("IsEnding", false);
             }
             thrusting = true;
-            if (!lastDirectionForward)
-            {
-                thrustingTime = 0;
-                lastDirectionForward = true;
-            }
         }
         else
         {
             if (thrusting)
             {
-                thrusterArt.enabled = false;
+                thrusterAnim.SetBool("IsStarting", false);
+                thrusterAnim.SetBool("IsEnding", true);
             }
             thrusting = false;
         }
@@ -190,6 +243,63 @@ public class PlayerController : Ship {
         {
             myBody.AddTorque(-turningAxis * turnSpeed);
             pressed = true;
+        }
+
+        //boosting logic
+        if (boostSpeedModifier > 1)
+        {
+            boostSpeedModifier -= 0.05f;
+        }
+        float lateralBoost = Input.GetAxis("RightJoystickX_P" + playerId);
+        float verticalBoost = Input.GetAxis("RightJoystickY_P" + playerId);
+        if ((lateralBoost != 0 || verticalBoost != 0) && boostAmount > 0)
+        {
+            if (!HasFlag(eShipState.Boosting))
+            {
+                AddFlag(eShipState.Boosting);
+                pullArt.enabled = true;
+            }
+            notUsingBoostTimer = 0;
+            
+            if (boostAmount == 0)
+            {
+                boostAmount = -60;
+            }
+        }
+        else if (HasFlag(eShipState.Boosting))
+        {
+            RemoveFlag(eShipState.Boosting);
+            pullArt.enabled = false;
+        }
+        else if ((notUsingBoostTimer += deltaTime) > 1 && boostAmount < boostStartingAmount)
+        {
+            boostAmount += 2;
+        }
+
+        if (boostAmount > 0)
+        {
+            if (lateralBoost != 0 && Mathf.Abs(lateralBoost) > Mathf.Abs(verticalBoost))
+            {
+                Vector2 normalizedForward = forward.normalized;
+                Vector2 boost = lateralBoost < 0 ? new Vector2(-normalizedForward.y, normalizedForward.x).normalized :
+                    new Vector2(normalizedForward.y, -normalizedForward.x).normalized;
+                myBody.AddForce(boost * 50);
+                boostAmount -= 0.3f;
+                pressed = true;
+                pullArt.transform.rotation = Quaternion.Euler(myBody.transform.rotation.eulerAngles + new Vector3(0, 0, lateralBoost < 0 ? 90 : -90));
+            }
+            else if (verticalBoost < 0)
+            {
+                boostSpeedModifier = 2;
+                pullArt.transform.rotation = myBody.transform.rotation;
+                boostAmount -= 1;
+            }
+            else if (verticalBoost > 0 && turningAxis != 0)
+            {
+                myBody.AddTorque(-turningAxis * turnSpeed * 2);
+                pullArt.transform.rotation = Quaternion.Euler(myBody.transform.rotation.eulerAngles + new Vector3(0, 0, turningAxis < 0 ? 120 : -120));
+                boostAmount -= 0.3f;
+            }
         }
 
         if (!thrusting)
@@ -212,39 +322,40 @@ public class PlayerController : Ship {
                 }
 
                 myBody.velocity += acceleration * deltaTime;
-
-                if (myBody.velocity.magnitude > maxSpeed)
-                {
-                    myBody.velocity = myBody.velocity.normalized * maxSpeed;
-                }
             }
         }
+
+        if (myBody.velocity.magnitude > (maxSpeed * boostSpeedModifier))
+        {
+            myBody.velocity = myBody.velocity.normalized * (maxSpeed * boostSpeedModifier);
+        }
+
+        trackingCamera.orthographicSize = Mathf.Clamp((5 + 2 * (1 - (myBody.velocity.magnitude / maxSpeed))),5,7);
     }
 
-    public void FireLaser()
+    public void FireLaser(bool big)
     {
         Vector2 normalizedForward = forward.normalized;
         Vector3 offset = fireRight ? new Vector3(-normalizedForward.y, normalizedForward.x, 0).normalized * 0.65f :
             new Vector3(normalizedForward.y, -normalizedForward.x, 0).normalized * 0.65f;
         fireRight = !fireRight;
 
-        if (chargingTimer < 0.2f)
+        if (!big)
         {
             Laser newLaser = (Laser)Instantiate(laserPrefab,
                 transform.position + (new Vector3(normalizedForward.x, normalizedForward.y, 0) * -0.02f) + offset,
                 transform.rotation);
 
             newLaser.velocity = new Vector3(forward.x, forward.y, 0) * 15;
-            //float theDot = Vector2.Dot(myBody.velocity, forward);
-            //if (theDot > 0)
-            //{
-            //    //newLaser.velocity.x += myBody.velocity.x * (theDot / maxSpeed);
-            //    //newLaser.velocity.y += myBody.velocity.y * (theDot / maxSpeed);
-            //}
             newLaser.ship = this;
             newLaser.damage = 10;
+            newLaser.LateStart();
+            for (int i = 0; i < followingShips.Count; i++)
+            {
+                followingShips[i].FireLaser();
+            }
         }
-        else
+        else if (big && chargingTimer > 0.2f)
         {
             Laser newLaser = (Laser)Instantiate(chargedLaserPrefab,
                 transform.position + (new Vector3(normalizedForward.x, normalizedForward.y, 0) * 0.8f),
@@ -252,15 +363,11 @@ public class PlayerController : Ship {
             newLaser.velocity = new Vector3(forward.x, forward.y, 0) * 8;
             newLaser.ship = this;
             newLaser.damage = 100;
+            newLaser.LateStart();
+            chargingTimer = 0;
         }
-        chargingTimer = 0;
 
         firingTimer = firingTimerReset;
-
-        for (int i = 0; i < followingShips.Count; i++)
-        {
-            followingShips[i].FireLaser();
-        }
     }
 
     private void MakeShipsFollow()
@@ -278,7 +385,7 @@ public class PlayerController : Ship {
                     if (Vector2.Distance(temp.transform.position, transform.position) < 3)
                     {
                         nearestShips.Add(temp);
-                        if (nearestShips.Count >= 2)
+                        if (nearestShips.Count >= 2 - followingShips.Count)
                         {
                             break;
                         }

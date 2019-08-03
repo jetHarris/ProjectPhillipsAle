@@ -12,7 +12,7 @@ public class Ship : MonoBehaviour {
     protected float thrustingTime = 0;
     public float health = 30;
     public float shieldHealth = 40;
-    public float shieldCount = 0;
+    public float shieldHealthStart;
     public Vector2 forward;
     protected float speed = 5000f;
     protected float turnSpeed = 1;
@@ -22,11 +22,14 @@ public class Ship : MonoBehaviour {
     public int shipId;
     public bool AIControlled = true;
     protected bool fireRight = true;
-    protected float shieldTimer = 0;
+    protected float shieldFlashTimer = 0;
     protected float shieldTimerReset = 1;
+    protected float timeSinceLastHit = 0;
     protected SpriteRenderer shipArt;
     protected SpriteRenderer thrusterArt;
+    protected Animator thrusterAnim;
     protected SpriteRenderer shieldArt;
+    protected Animator shieldAnim;
     protected SpriteRenderer teamColourArt;
     protected SpriteRenderer miniMapArt;
     protected float alertTimer = 0;
@@ -51,39 +54,47 @@ public class Ship : MonoBehaviour {
         var Sprites = gameObject.GetComponentsInChildren<SpriteRenderer>();
         shipArt = Sprites[0];
         thrusterArt = Sprites[1];
-        thrusterArt.enabled = false;
+        //thrusterArt.enabled = false;
+        thrusterAnim = thrusterArt.GetComponent<Animator>();
         shieldArt = Sprites[2];
+        shieldAnim = shieldArt.GetComponent<Animator>();
         shieldArt.color = new Color(1, 1, 1, 0);
         teamColourArt = Sprites[3];
         teamColourArt.color = PlayerManager.teamColours[teamId];
         //minimap display
         miniMapArt = Sprites[4];
         miniMapArt.color = PlayerManager.teamColours[teamId];
+
+        shieldHealthStart = shieldHealth;
     }
 	
 	// Update is called once per frame
 	protected void CustomUpdate () {
         float deltaTime = Time.deltaTime;
-		if (shieldHealth <= 0)
+		if (shieldHealth <= 0 && alertTimer > 0)
         {
-            shieldCount += deltaTime;
-            if (shieldCount > 4)
+            alertTimer -= deltaTime;
+            shipArt.color = new Color(1, (1 - (alertTimer / ALERT_TIME_MAX)), (1 - (alertTimer / ALERT_TIME_MAX)), 1);
+        }
+
+        if (shieldHealth < shieldHealthStart)
+        {
+            if (timeSinceLastHit < 50)
             {
-                shieldCount = 0;
-                shieldHealth = 40;
-                shipArt.color = new Color(1, 1, 1, 1);
+                timeSinceLastHit += deltaTime;
             }
-            else if (alertTimer > 0)
+
+            if (timeSinceLastHit > 2)
             {
-                alertTimer -= deltaTime;
-                shipArt.color = new Color(1, (1-(alertTimer/ ALERT_TIME_MAX)),(1-(alertTimer/ ALERT_TIME_MAX)), 1);
+                shieldHealth += 1;
+                shipArt.color = new Color(1, 1, 1, 1);
             }
         }
 
-        if (shieldTimer > 0)
+        if (shieldFlashTimer > 0)
         {
-            shieldTimer -= deltaTime;
-            shieldArt.color = new Color(1, 1, 1, shieldTimer / shieldTimerReset);
+            shieldFlashTimer -= deltaTime;
+            shieldArt.color = new Color(1, 1, 1, shieldFlashTimer / shieldTimerReset);
         }
 
         //update any followers
@@ -106,13 +117,15 @@ public class Ship : MonoBehaviour {
     {
         if (isAlive)
         {
+            timeSinceLastHit = 0;
             if (shieldHealth > 0)
             {
                 shieldHealth -= damageAmount;
-                shieldTimer = shieldTimerReset;
+                shieldFlashTimer = shieldTimerReset;
                 //damage bleed through on by default currently
-                if (shieldHealth < 0)
+                if (shieldHealth <= 0)
                 {
+                    shieldAnim.SetTrigger("broken");
                     health += shieldHealth;
                 }
             }
@@ -126,12 +139,14 @@ public class Ship : MonoBehaviour {
             {
                 if (shipArt != null)
                 {
-                    thrusterArt.enabled = false;
                     shipArt.color = new Color(94 / 255f, 79 / 255f, 79 / 255f, 150 / 255f);
                     shieldArt.color = new Color(1, 1, 1, 0);
                     miniMapArt.enabled = false;
                 }
-                myBody.drag = 1;
+                if (AIControlled)
+                {
+                    myBody.drag = 1; //remove this when state logic is in this class
+                }
                 Die();
             }
         }

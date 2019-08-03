@@ -9,6 +9,16 @@ public class Explosion : MonoBehaviour {
     void Start () {
         var Sprites = gameObject.GetComponentsInChildren<SpriteRenderer>();
         explosionArt = Sprites[0];
+        if (PlayerManager.explosionSoundCooldown <= 0)
+        {
+            AudioSource sound = GetComponent<AudioSource>();
+            if (sound != null)
+            {
+                sound.Play();
+                PlayerManager.explosionSoundCooldown = 0.2f;
+            }
+
+        }
     }
 	
 	// Update is called once per frame

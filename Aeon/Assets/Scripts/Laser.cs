@@ -29,10 +29,15 @@ public class Laser : MonoBehaviour {
             
         }
 	}
+
+    public void LateStart()
+    {
+        GetComponent<Rigidbody2D>().velocity = velocity;
+    }
 	
 	// Update is called once per frame
 	void Update () {
-        gameObject.transform.position += velocity * Time.deltaTime;
+        //gameObject.transform.position += velocity * Time.deltaTime;
         currentLifetime += Time.deltaTime;
         if (currentLifetime > maxLifetime)
         {
@@ -56,7 +61,10 @@ public class Laser : MonoBehaviour {
                     possibleTarget.TakeDamage(damage, ship);
                     if (type != eLaserType.Big)
                     {
-                        Destroy(gameObject);
+                        //instead of destroying just disable
+                        gameObject.GetComponent<Collider2D>().enabled = false;
+                        gameObject.GetComponent<SpriteRenderer>().color = new Color(1, 1, 1, 0);
+                        //Destroy(gameObject);
                     }
                 }
             }

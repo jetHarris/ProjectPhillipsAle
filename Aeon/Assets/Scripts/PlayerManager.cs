@@ -16,6 +16,7 @@ public class PlayerManager : MonoBehaviour {
     }
 
     public static float laserSoundCooldown = 0.2f;
+    public static float explosionSoundCooldown = 0.2f;
 
     public List<Player> players;
     public int assignedPlayers;
@@ -120,6 +121,10 @@ public class PlayerManager : MonoBehaviour {
         if (laserSoundCooldown >= 0)
         {
             laserSoundCooldown -= Time.deltaTime;
+        }
+        if (explosionSoundCooldown >= 0)
+        {
+            explosionSoundCooldown -= Time.deltaTime;
         }
     }
 }
