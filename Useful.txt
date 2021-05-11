@@ -1,0 +1,55 @@
+ public void UpdateShieldGlow(bool glow)
+    {
+        if (glow)
+        {
+            shieldBar.color = new Color(1, 1, 1, 1);
+        }
+        else
+        {
+            shieldBar.color = new Color(0, 0.6f, 1, 1);
+        }
+    }
+	
+	in UI
+	
+	
+//turning on and off the reflector
+        bool leftStickDown = Input.GetButton("LeftStick_P" + playerId);
+        if (leftStickDown && shieldHealth > 0)
+        {
+            shieldFlashTimer = shieldTimerReset;
+            shieldHealth -= 0.3f;
+            if (shieldHealth <= 0)
+            {
+                shieldAnim.SetTrigger("broken");
+            }
+            timeSinceLastHit = 0;
+        }
+        if (leftStickDown && !HasFlag(eShipState.Repelling) && shieldHealth > 0)
+        {
+            AddFlag(eShipState.Repelling);
+            UI.Instance.UpdateGlowingShieldStatus(playerId, true);
+        }
+        else if ((!leftStickDown || shieldHealth <= 0) && HasFlag(eShipState.Repelling))
+        {
+            RemoveFlag(eShipState.Repelling);
+            UI.Instance.UpdateGlowingShieldStatus(playerId, false);
+        }
+		
+		in  playercontroller
+		
+		
+		
+if (possibleTarget.HasFlag(Ship.eShipState.Repelling))
+                {
+                    Vector2 normal = (myBody.position - possibleTarget.myBody.position).normalized;
+                    myBody.velocity = myBody.velocity - (2 * normal * (Vector2.Dot(normal, myBody.velocity)));
+
+                    float angle = Mathf.Atan2(myBody.velocity.y, myBody.velocity.x) * Mathf.Rad2Deg;
+                    gameObject.transform.rotation = Quaternion.AngleAxis(angle, Vector3.forward);
+                    gameObject.transform.rotation = Quaternion.Euler(gameObject.transform.rotation.eulerAngles + new Vector3(0, 0, 90));
+
+                    ship = possibleTarget;
+                }
+				
+				in laser
