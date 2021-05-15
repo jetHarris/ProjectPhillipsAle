@@ -5,6 +5,10 @@ using UnityEngine;
 public class Explosion : MonoBehaviour {
     protected SpriteRenderer explosionArt;
     public float opacity = 1.0f;
+    public float prefade = 0;
+    public float faceAccel = 1;
+    public Rigidbody2D myBody;
+
     // Use this for initialization
     void Start () {
         var Sprites = gameObject.GetComponentsInChildren<SpriteRenderer>();
@@ -23,7 +27,13 @@ public class Explosion : MonoBehaviour {
 	
 	// Update is called once per frame
 	void Update () {
-        opacity -= 0.009f;
+        float deltaTime = Time.deltaTime;
+        if (prefade > 0)
+        {
+            prefade -= deltaTime;
+            return;
+        }
+        opacity -= 0.009f * faceAccel;
         explosionArt.color = new Color(1, 1, 1, opacity);
         if (opacity <= 0)
         {

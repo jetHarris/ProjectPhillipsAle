@@ -264,6 +264,11 @@ public class UI : MonoBehaviour {
         playerStatuses[playerId].UpdatePlayerStatus(healthRatio, shieldRatio, ammoRatio);
     }
 
+    public void UpdateGlowingShieldStatus(int playerID, bool glow)
+    {
+
+    }
+
     public void MinimapEnableDisable(int playerId, bool enable)
     {
         if (playerId == 0)
@@ -287,6 +292,15 @@ public class UI : MonoBehaviour {
         {
             newPos = new Vector3(250, 230, 0);
         }
+
+        Shout newShout = Instantiate(shoutPrefab, newPos, new Quaternion());
+        newShout.GetComponentInChildren<Text>().text = text;
+        newShout.transform.SetParent(this.transform);
+    }
+
+    public void Shout(string text)
+    {
+        Vector3 newPos = new Vector3(500, 460, 0);
 
         Shout newShout = Instantiate(shoutPrefab, newPos, new Quaternion());
         newShout.GetComponentInChildren<Text>().text = text;

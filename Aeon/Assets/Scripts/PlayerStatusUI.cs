@@ -25,4 +25,18 @@ public class PlayerStatusUI : MonoBehaviour {
         shieldBar.fillAmount = shieldRatio;
         ammoBar.fillAmount = ammoRatio;
     }
+
+
+
+    public void UpdateShieldGlow(bool glow)
+    {
+        if (glow)
+        {
+            shieldBar.color = new Color(1, 1, 1, 1);
+        }
+        else
+        {
+            shieldBar.color = new Color(0, 0.6f, 1, 1);
+        }
+    }
 }

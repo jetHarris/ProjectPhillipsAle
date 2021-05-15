@@ -9,6 +9,7 @@ public class Laser : MonoBehaviour {
     private float maxLifetime = 10;
     private float currentLifetime = 0;
     public float damage;
+    public Rigidbody2D myBody;
     public enum eLaserType
     {
         Regular,
@@ -58,14 +59,29 @@ public class Laser : MonoBehaviour {
             {
                 if (possibleTarget.isAlive)
                 {
-                    possibleTarget.TakeDamage(damage, ship);
-                    if (type != eLaserType.Big)
+                    if (possibleTarget.HasFlag(Ship.eShipState.Repelling))
                     {
-                        //instead of destroying just disable
-                        gameObject.GetComponent<Collider2D>().enabled = false;
-                        gameObject.GetComponent<SpriteRenderer>().color = new Color(1, 1, 1, 0);
-                        //Destroy(gameObject);
+                        Vector2 normal = (myBody.position - possibleTarget.myBody.position).normalized;
+                        myBody.velocity = myBody.velocity - (2 * normal * (Vector2.Dot(normal, myBody.velocity)));
+
+                        float angle = Mathf.Atan2(myBody.velocity.y, myBody.velocity.x) * Mathf.Rad2Deg;
+                        gameObject.transform.rotation = Quaternion.AngleAxis(angle, Vector3.forward);
+                        gameObject.transform.rotation = Quaternion.Euler(gameObject.transform.rotation.eulerAngles + new Vector3(0, 0, 90));
+
+                        ship = possibleTarget;
                     }
+                    else
+                    {
+                        possibleTarget.TakeDamage(damage, ship, new Vector2(transform.position.x, transform.position.y));
+                        if (type != eLaserType.Big)
+                        {
+                            //instead of destroying just disable
+                            //gameObject.GetComponent<Collider2D>().enabled = false;
+                            //gameObject.GetComponent<SpriteRenderer>().color = new Color(1, 1, 1, 0);
+                            Destroy(gameObject);
+                        }
+                    }
+
                 }
             }
         }

@@ -24,7 +24,7 @@ public class AIShip : Ship
     private bool animThrusting = false; //Awful, take this out as soon as more state logic has been put in
 
     private Vector2 targetLocation;
-    public enum eState
+    public enum eAIState
     {
         Hunting,
         Fleeing,
@@ -34,7 +34,7 @@ public class AIShip : Ship
         Following
     }
 
-    public eState state;
+    public eAIState stateAI;
     void Start () {
         firingTimerReset = firingTimer;
         acceleration = new Vector2();
@@ -42,7 +42,7 @@ public class AIShip : Ship
         GameObject playerManagerObject = GameObject.Find("PlayerManagerMain");
         playerManager = playerManagerObject.GetComponent<PlayerManager>();
         playerManager.ships.Add(this);
-        state = eState.Travelling;
+        stateAI = eAIState.Travelling;
         fleeOffset = new Vector2();
         targetLocation = transform.position;
         new Vector2(transform.up.x, transform.up.y);
@@ -62,9 +62,9 @@ public class AIShip : Ship
         forward.y = transform.up.y;
         float deltaTime = Time.deltaTime;
 
-        switch (state)
+        switch (stateAI)
         {
-            case eState.Travelling:
+            case eAIState.Travelling:
             {
                 // find a target if we dont have one
                 if (target == null || !target.isAlive || target.teamId == teamId)
@@ -89,17 +89,17 @@ public class AIShip : Ship
                     if (foundNum >= 0)
                     {
                         target = playerManager.ships[foundNum];
-                        state = eState.Hunting;
+                            stateAI = eAIState.Hunting;
                     }
                 }
                 else
                 {
-                    state = eState.Hunting;
+                        stateAI = eAIState.Hunting;
                 }
             }
             break;
 
-            case eState.Following:
+            case eAIState.Following:
             {
                 if (target != null)
                 {
@@ -130,9 +130,9 @@ public class AIShip : Ship
                     if (target.AIControlled)
                     {
                         AIShip theOtherShip = ((AIShip)target);
-                        if (!target.isAlive || theOtherShip.state == eState.Travelling || theOtherShip.state == eState.Fleeing)
+                        if (!target.isAlive || theOtherShip.stateAI == eAIState.Travelling || theOtherShip.stateAI == eAIState.Fleeing)
                         {
-                            state = eState.Travelling;
+                                stateAI = eAIState.Travelling;
                             theOtherShip.followingShips.Remove(this);
                         }
                     }
@@ -140,20 +140,20 @@ public class AIShip : Ship
                     {
                         if (!target.isAlive)
                         {
-                            state = eState.Travelling;
+                                stateAI = eAIState.Travelling;
                             target.followingShips.Remove(this);
                         }
                     }
                 }
                 else
                 {
-                    state = eState.Travelling;
+                     stateAI = eAIState.Travelling;
                 }
 
             }
             break;
 
-            case eState.Hunting:
+            case eAIState.Hunting:
             {
                 if (target != null && target.isAlive)
                 {
@@ -192,7 +192,7 @@ public class AIShip : Ship
                                     (forward.normalized * 9) +
                                     new Vector2(-forward.y, forward.x).normalized * Random.Range(2, 4);
                             }
-                            state = eState.StrafingToAttack;
+                            stateAI = eAIState.StrafingToAttack;
                         }
                     }
 
@@ -229,14 +229,14 @@ public class AIShip : Ship
                                 if (temp.shipId != this.shipId &&
                                     temp.isAlive &&
                                     temp.teamId == teamId &&
-                                    temp.state == eState.Hunting &&
+                                    temp.stateAI == eAIState.Hunting &&
                                     temp.target.shipId == this.target.shipId &&
                                     temp.followingShips.Count < 2
                                     )
                                 {
                                     target = temp;
                                     FindFollowingPosition();
-                                    state = eState.Following;
+                                    stateAI = eAIState.Following;
                                     break;
                                 }
                             }
@@ -245,12 +245,12 @@ public class AIShip : Ship
                 }
                 else
                 {
-                    state = eState.Travelling;
+                    stateAI = eAIState.Travelling;
                 }
             }
             break;
 
-            case eState.Fleeing:
+            case eAIState.Fleeing:
             {
                 if (aggressor != null)
                 {
@@ -282,22 +282,22 @@ public class AIShip : Ship
                     }
                     else
                     {
-                        state = eState.Travelling;
+                         stateAI = eAIState.Travelling;
                     }
 
 
                 }
                 else
                 {
-                    //todo
-                    //search for any nearby enemy units, if there is one, assign a new aggressor
-                    //if not break out of fleeing
-                    state = eState.Travelling;
+                        //todo
+                        //search for any nearby enemy units, if there is one, assign a new aggressor
+                        //if not break out of fleeing
+                    stateAI = eAIState.Travelling;
                 }
             }
             break;
 
-            case eState.StrafingToFlee:
+            case eAIState.StrafingToFlee:
             {
                 TurnTowards(deltaTime, targetLocation);
                 MoveForward(deltaTime, 3.3f, true);
@@ -307,12 +307,12 @@ public class AIShip : Ship
                 float distance = Vector2.Distance(targetLocation, transform.position);
                 if (distance < 0.2f || fleeOffsetTime > fleeOffsetMaxTime)
                 {
-                    state = eState.Fleeing;
+                    stateAI = eAIState.Fleeing;
                 }
             }
             break;
 
-            case eState.StrafingToAttack:
+            case eAIState.StrafingToAttack:
             {
                 TurnTowards(deltaTime, targetLocation);
                 MoveForward(deltaTime, 3.3f, true);
@@ -322,7 +322,7 @@ public class AIShip : Ship
                 float distance = Vector2.Distance(targetLocation, transform.position);
                 if (distance < 0.2f)
                 {
-                    state = eState.Hunting;
+                    stateAI = eAIState.Hunting;
                 }
             }
             break;
@@ -388,7 +388,7 @@ public class AIShip : Ship
         otherShip.followingShips.Add(this);
         if (followingShips.Count > 0)
         {
-            followingShips[0].state = eState.Travelling;
+            followingShips[0].stateAI = eAIState.Travelling;
             followingShips[0].target = null;
             followingShips.RemoveAt(0);
         }
@@ -464,9 +464,9 @@ public class AIShip : Ship
         return angle;
     }
 
-    public override void TakeDamage(float damageAmount, Ship attacker)
+    public override void TakeDamage(float damageAmount, Ship attacker, Vector2 hitlocation)
     {
-        base.TakeDamage(damageAmount, attacker);
+        base.TakeDamage(damageAmount, attacker, hitlocation);
 
         if (isAlive)
         {
@@ -476,9 +476,9 @@ public class AIShip : Ship
             if (Random.Range(0, 50) > 40)
             {
                 aggressor = attacker;
-                switch (state)
+                switch (stateAI)
                 {
-                    case eState.Hunting:
+                    case eAIState.Hunting:
                     {
                         //go into a strafing flee, dont just turn directly around
                         //set the target location
@@ -497,12 +497,12 @@ public class AIShip : Ship
                         }
                         fleeOffsetTime = 0;
                         fleeOffsetMaxTime = Random.Range(6, 12);
-                        state = eState.StrafingToFlee;
+                        stateAI = eAIState.StrafingToFlee;
                     }
                     break;
                     default:
                     {
-                        state = eState.Fleeing;
+                        stateAI = eAIState.Fleeing;
                         RecalulateFleeOffset();
                     }
                     break;
@@ -516,6 +516,35 @@ public class AIShip : Ship
         base.Die();
         playerManager.ships.Remove(this);
         Instantiate(explosionPrefab, transform.position, transform.rotation);
+
+        for (int i = 0; i < 4; ++i)
+        {
+            Vector3 position = transform.position;
+            if (i %2 == 0)
+            {
+                position.x += Random.Range((float)0, (float)2);
+            }
+            else
+            {
+                position.y += Random.Range((float)0, (float)2);
+            }
+            var rotation = Quaternion.Euler(Random.Range((float)0, (float)360), 0, 0);
+            var junk1 = Instantiate(junk, transform.position, rotation);
+            Vector2 newVel = myBody.velocity;
+            if (i % 2 == 0)
+            {
+                newVel.x += Random.Range((float)0, (float)2);
+            }
+            else
+            {
+                newVel.y += Random.Range((float)0, (float)2);
+            }
+
+            junk1.myBody.velocity = newVel;
+
+        }
+
+        UI.Instance.Shout("Kill");
         Destroy(gameObject);
     }
 

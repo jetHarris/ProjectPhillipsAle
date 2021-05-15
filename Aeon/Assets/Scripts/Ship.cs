@@ -36,9 +36,40 @@ public class Ship : MonoBehaviour {
     protected const float ALERT_TIME_MAX = 1;
     public List<AIShip> followingShips;
     public Explosion explosionPrefab;
+    public Explosion smallExplosionPrefab;
+    public Explosion shieldHitPrefab;
+    public Explosion junk;
     public bool isAlive
     {
         get { return health > 0; }
+    }
+
+    [System.Flags]
+    public enum eShipState
+    {
+        None = 0,
+        Boosting = 1,
+        Thrusting = 2,
+        ChargingSecondary = 4,
+        Stabilizing = 8,
+        Repelling = 16,
+    }
+
+    public eShipState state;
+
+    public bool HasFlag(eShipState flag)
+    {
+        return (state & flag) != 0;
+    }
+
+    public void AddFlag(eShipState flag)
+    {
+        state |= flag;
+    }
+
+    public void RemoveFlag(eShipState flag)
+    {
+        state &= ~flag;
     }
 
     // Use this for initialization
@@ -102,7 +133,7 @@ public class Ship : MonoBehaviour {
         bool first = true;
         for (int i = 0; i < followerCount; i++)
         {
-            if (followingShips[i] == null || !followingShips[i].isAlive ||followingShips[i].state != AIShip.eState.Following)
+            if (followingShips[i] == null || !followingShips[i].isAlive ||followingShips[i].stateAI != AIShip.eAIState.Following)
             {
                 followingShips.RemoveAt(i);
                 break;
@@ -113,7 +144,7 @@ public class Ship : MonoBehaviour {
         }
     }
 
-    public virtual void TakeDamage(float damageAmount, Ship attacker)
+    public virtual void TakeDamage(float damageAmount, Ship attacker, Vector2 hitlocation)
     {
         if (isAlive)
         {
@@ -128,11 +159,13 @@ public class Ship : MonoBehaviour {
                     shieldAnim.SetTrigger("broken");
                     health += shieldHealth;
                 }
+                Instantiate(shieldHitPrefab, hitlocation, transform.rotation);
             }
             else
             {
                 health -= damageAmount;
                 alertTimer = ALERT_TIME_MAX;
+                Instantiate(smallExplosionPrefab, hitlocation, transform.rotation);
             }
 
             if (!isAlive)
@@ -149,6 +182,7 @@ public class Ship : MonoBehaviour {
                 }
                 Die();
             }
+
         }
     }
 
